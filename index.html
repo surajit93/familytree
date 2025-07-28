@@ -19,6 +19,13 @@
     h2 { text-align: center; }
     input, select, button {
       width: 100%; padding: 10px; margin: 5px 0;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    button {
+      background: #4CAF50; color: white; border: none;
+    }
+    button:hover {
+      background: #45a049;
     }
     .node-card {
       border: 1px solid #ccc;
@@ -27,6 +34,8 @@
       background: #fff;
       text-align: center;
       width: 120px;
+      position: relative;
+      margin: 10px auto;
     }
     .tree-container {
       overflow: auto;
@@ -38,6 +47,7 @@
       background: white;
       border: 1px solid #ccc;
       z-index: 999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     .context-menu button {
       width: 100%; text-align: left; border: none;
@@ -45,7 +55,7 @@
     }
   </style>
 </head>
-<body>
+<body oncontextmenu="return false">
   <div id="register">
     <h2>Register</h2>
     <input type="text" id="regEmail" placeholder="Email" />
@@ -75,6 +85,8 @@
     <button onclick="editNode()">Edit</button>
     <button onclick="deleteNode()">Delete</button>
     <button onclick="addChild()">Add Child</button>
+    <button onclick="addParent()">Add Parent</button>
+    <button onclick="addSibling()">Add Sibling</button>
   </div>
 
   <script>
@@ -84,10 +96,10 @@
 
     function showRegister() {
       document.getElementById('register').style.display = 'block';
-      document.getElementById('login').style.display = 'none';
+      document.getElementById('login').style.display = 'block';
     }
     function showLogin() {
-      document.getElementById('register').style.display = 'none';
+      document.getElementById('register').style.display = 'block';
       document.getElementById('login').style.display = 'block';
     }
     function showApp() {
@@ -138,7 +150,7 @@
         div.className = 'node-card';
         div.style.marginLeft = level * 40 + 'px';
         div.innerHTML = `<b>${node.name}</b>`;
-        div.onclick = e => showMenu(e, node);
+        div.oncontextmenu = e => showMenu(e, node);
         container.appendChild(div);
         (node.children || []).forEach(c => render(c, level + 1));
       }
@@ -181,6 +193,28 @@
       selectedNode.children = selectedNode.children || [];
       const name = prompt('Child name?');
       if (name) selectedNode.children.push({ name });
+      save();
+      renderTree();
+    }
+    function addParent() {
+      const name = prompt('Parent name?');
+      if (!name) return;
+      treeData = { name, children: [treeData] };
+      save();
+      renderTree();
+    }
+    function addSibling() {
+      const name = prompt('Sibling name?');
+      if (!name) return;
+      function recurse(parent) {
+        if (!parent.children) return;
+        if (parent.children.includes(selectedNode)) {
+          parent.children.push({ name });
+        } else {
+          parent.children.forEach(recurse);
+        }
+      }
+      recurse(treeData);
       save();
       renderTree();
     }
