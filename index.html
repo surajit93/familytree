@@ -1,243 +1,78 @@
+<!-- Save this as index.html and open in browser -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Family Tree App</title>
+  <title>Family Tree</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #f0f2f5;
-    }
-    #login, #register, #app {
-      display: none;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-    }
-    h2 { text-align: center; }
-    input, select, button {
-      width: 100%; padding: 10px; margin: 5px 0;
-      border: 1px solid #ccc; border-radius: 4px;
-    }
-    button {
-      background: #4CAF50; color: white; border: none;
-    }
-    button:hover {
-      background: #45a049;
-    }
-    .node-card {
-      border: 1px solid #ccc;
-      padding: 10px;
-      border-radius: 10px;
-      background: #fff;
-      text-align: center;
-      width: 120px;
-      position: relative;
-      margin: 10px auto;
-    }
-    .tree-container {
-      overflow: auto;
-      text-align: center;
-    }
-    .context-menu {
-      position: absolute;
-      display: none;
-      background: white;
-      border: 1px solid #ccc;
-      z-index: 999;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    .context-menu button {
-      width: 100%; text-align: left; border: none;
-      background: white; padding: 10px;
-    }
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1em; }
+    input, button, textarea { width: 100%; margin-top: 8px; padding: 8px; font-size: 1em; }
+    .section { margin-bottom: 20px; }
+    pre { background: #f4f4f4; padding: 10px; overflow: auto; }
   </style>
 </head>
-<body oncontextmenu="return false">
-  <div id="register">
-    <h2>Register</h2>
-    <input type="text" id="regEmail" placeholder="Email" />
-    <input type="text" id="regISD" placeholder="ISD Code" />
-    <input type="text" id="regPhone" placeholder="Phone Number" />
-    <input type="password" id="regPass" placeholder="Password" />
+<body>
+
+  <h2>👤 Register / Login</h2>
+  <div class="section">
+    <input type="text" id="userId" placeholder="User ID">
+    <input type="password" id="password" placeholder="Password">
     <button onclick="register()">Register</button>
-    <button onclick="showLogin()">Go to Login</button>
-  </div>
-
-  <div id="login">
-    <h2>Login</h2>
-    <input type="text" id="loginEmail" placeholder="Email" />
-    <input type="password" id="loginPass" placeholder="Password" />
     <button onclick="login()">Login</button>
-    <button onclick="showRegister()">Go to Register</button>
+    <p id="status"></p>
   </div>
 
-  <div id="app">
-    <h2>Family Tree</h2>
-    <button onclick="exportData()">Export JSON</button>
-    <input type="file" accept=".json" onchange="importData(event)" />
-    <div class="tree-container" id="tree"></div>
-  </div>
-
-  <div class="context-menu" id="menu">
-    <button onclick="editNode()">Edit</button>
-    <button onclick="deleteNode()">Delete</button>
-    <button onclick="addChild()">Add Child</button>
-    <button onclick="addParent()">Add Parent</button>
-    <button onclick="addSibling()">Add Sibling</button>
+  <h2>🌳 Family Tree JSON</h2>
+  <div class="section">
+    <textarea id="treeData" rows="10" placeholder="Edit your tree JSON here..."></textarea>
+    <button onclick="save()">Save</button>
+    <p id="saveStatus"></p>
   </div>
 
   <script>
-    let currentUser = null;
-    let treeData = {};
-    let selectedNode = null;
+    const API_BASE_URL = 'https://familytree-api.surajit-familytree.workers.dev'; // ✅ Replace if needed
+    let userId = '';
+    let password = '';
 
-    function showRegister() {
-      document.getElementById('register').style.display = 'block';
-      document.getElementById('login').style.display = 'block';
-    }
-    function showLogin() {
-      document.getElementById('register').style.display = 'block';
-      document.getElementById('login').style.display = 'block';
-    }
-    function showApp() {
-      document.getElementById('register').style.display = 'none';
-      document.getElementById('login').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      renderTree();
+    async function register() {
+      userId = document.getElementById('userId').value.trim();
+      password = document.getElementById('password').value;
+      const res = await fetch(API_BASE_URL + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password })
+      });
+      const json = await res.json();
+      document.getElementById('status').textContent = json.success ? '✅ Registered!' : '❌ ' + json.message;
     }
 
-    function register() {
-      const email = regEmail.value;
-      const phone = regISD.value + regPhone.value;
-      const pass = regPass.value;
-      const users = JSON.parse(localStorage.getItem('users') || '{}');
-      for (let u in users) {
-        if (users[u].phone === phone) return alert('Phone already registered');
-      }
-      users[email] = { pass, phone, tree: { name: email, children: [] } };
-      localStorage.setItem('users', JSON.stringify(users));
-      alert('Registered');
-      showLogin();
-    }
-
-    function login() {
-      const email = loginEmail.value;
-      const pass = loginPass.value;
-      const users = JSON.parse(localStorage.getItem('users') || '{}');
-      if (users[email]?.pass === pass) {
-        currentUser = email;
-        treeData = users[email].tree;
-        showApp();
-      } else alert('Invalid login');
-    }
-
-    function save() {
-      const users = JSON.parse(localStorage.getItem('users') || '{}');
-      if (currentUser && users[currentUser]) {
-        users[currentUser].tree = treeData;
-        localStorage.setItem('users', JSON.stringify(users));
+    async function login() {
+      userId = document.getElementById('userId').value.trim();
+      password = document.getElementById('password').value;
+      const res = await fetch(API_BASE_URL + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password })
+      });
+      const json = await res.json();
+      if (json.success) {
+        document.getElementById('treeData').value = JSON.stringify(json.tree || {}, null, 2);
+        document.getElementById('status').textContent = '✅ Logged in!';
+      } else {
+        document.getElementById('status').textContent = '❌ ' + json.message;
       }
     }
 
-    function renderTree() {
-      const container = document.getElementById('tree');
-      container.innerHTML = '';
-      function render(node, level = 0) {
-        const div = document.createElement('div');
-        div.className = 'node-card';
-        div.style.marginLeft = level * 40 + 'px';
-        div.innerHTML = `<b>${node.name}</b>`;
-        div.oncontextmenu = e => showMenu(e, node);
-        container.appendChild(div);
-        (node.children || []).forEach(c => render(c, level + 1));
-      }
-      render(treeData);
+    async function save() {
+      const tree = document.getElementById('treeData').value;
+      const res = await fetch(API_BASE_URL + '/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password, tree })
+      });
+      const json = await res.json();
+      document.getElementById('saveStatus').textContent = json.success ? '✅ Saved!' : '❌ ' + json.message;
     }
-
-    function showMenu(e, node) {
-      e.preventDefault();
-      selectedNode = node;
-      const menu = document.getElementById('menu');
-      menu.style.left = e.pageX + 'px';
-      menu.style.top = e.pageY + 'px';
-      menu.style.display = 'block';
-      document.addEventListener('click', hideMenu);
-    }
-    function hideMenu() {
-      document.getElementById('menu').style.display = 'none';
-      document.removeEventListener('click', hideMenu);
-    }
-
-    function editNode() {
-      const newName = prompt('Enter new name', selectedNode.name);
-      if (newName) {
-        selectedNode.name = newName;
-        save();
-        renderTree();
-      }
-    }
-    function deleteNode() {
-      function recurse(parent) {
-        if (!parent.children) return;
-        parent.children = parent.children.filter(c => c !== selectedNode);
-        parent.children.forEach(recurse);
-      }
-      recurse(treeData);
-      save();
-      renderTree();
-    }
-    function addChild() {
-      selectedNode.children = selectedNode.children || [];
-      const name = prompt('Child name?');
-      if (name) selectedNode.children.push({ name });
-      save();
-      renderTree();
-    }
-    function addParent() {
-      const name = prompt('Parent name?');
-      if (!name) return;
-      treeData = { name, children: [treeData] };
-      save();
-      renderTree();
-    }
-    function addSibling() {
-      const name = prompt('Sibling name?');
-      if (!name) return;
-      function recurse(parent) {
-        if (!parent.children) return;
-        if (parent.children.includes(selectedNode)) {
-          parent.children.push({ name });
-        } else {
-          parent.children.forEach(recurse);
-        }
-      }
-      recurse(treeData);
-      save();
-      renderTree();
-    }
-
-    function exportData() {
-      const blob = new Blob([JSON.stringify(treeData)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'tree.json';
-      a.click();
-    }
-
-    function importData(e) {
-      const reader = new FileReader();
-      reader.onload = function () {
-        treeData = JSON.parse(reader.result);
-        save();
-        renderTree();
-      };
-      reader.readAsText(e.target.files[0]);
-    }
-
-    showLogin();
   </script>
+
 </body>
 </html>
