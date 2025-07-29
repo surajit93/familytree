@@ -1,78 +1,149 @@
-<!-- Save this as index.html and open in browser -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Family Tree</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Tree App</title>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1em; }
-    input, button, textarea { width: 100%; margin-top: 8px; padding: 8px; font-size: 1em; }
-    .section { margin-bottom: 20px; }
-    pre { background: #f4f4f4; padding: 10px; overflow: auto; }
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #loginPage, #treePage { display: none; padding: 20px; }
+    .node { display: inline-block; text-align: center; margin: 10px; border: 1px solid #ccc; padding: 10px; position: relative; cursor: pointer; background: #f9f9f9; border-radius: 5px; }
+    .context-menu { position: absolute; display: none; background: #fff; border: 1px solid #ccc; z-index: 10; }
+    .context-menu div { padding: 5px 10px; cursor: pointer; }
+    .context-menu div:hover { background-color: #eee; }
   </style>
 </head>
 <body>
 
-  <h2>👤 Register / Login</h2>
-  <div class="section">
-    <input type="text" id="userId" placeholder="User ID">
-    <input type="password" id="password" placeholder="Password">
-    <button onclick="register()">Register</button>
-    <button onclick="login()">Login</button>
-    <p id="status"></p>
-  </div>
+<div id="loginPage">
+  <h2>Register / Login</h2>
+  <input type="email" id="email" placeholder="Email"><br>
+  <input type="password" id="password" placeholder="Password"><br>
+  <input type="text" id="phone" placeholder="Phone (register only)"><br>
+  <button onclick="register()">Register</button>
+  <button onclick="login()">Login</button>
+</div>
 
-  <h2>🌳 Family Tree JSON</h2>
-  <div class="section">
-    <textarea id="treeData" rows="10" placeholder="Edit your tree JSON here..."></textarea>
-    <button onclick="save()">Save</button>
-    <p id="saveStatus"></p>
-  </div>
+<div id="treePage">
+  <h2>Family Tree</h2>
+  <div id="treeContainer"></div>
+</div>
 
-  <script>
-    const API_BASE_URL = 'https://familytree-api.surajit-familytree.workers.dev'; // ✅ Replace if needed
-    let userId = '';
-    let password = '';
+<div class="context-menu" id="contextMenu"></div>
 
-    async function register() {
-      userId = document.getElementById('userId').value.trim();
-      password = document.getElementById('password').value;
-      const res = await fetch(API_BASE_URL + '/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password })
-      });
-      const json = await res.json();
-      document.getElementById('status').textContent = json.success ? '✅ Registered!' : '❌ ' + json.message;
-    }
+<script>
+const API_BASE = "/";
+let currentEmail = localStorage.getItem("email");
+let familyTree = [];
 
-    async function login() {
-      userId = document.getElementById('userId').value.trim();
-      password = document.getElementById('password').value;
-      const res = await fetch(API_BASE_URL + '/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password })
-      });
-      const json = await res.json();
-      if (json.success) {
-        document.getElementById('treeData').value = JSON.stringify(json.tree || {}, null, 2);
-        document.getElementById('status').textContent = '✅ Logged in!';
-      } else {
-        document.getElementById('status').textContent = '❌ ' + json.message;
-      }
-    }
+window.onload = () => {
+  if (currentEmail) {
+    fetchTree();
+  } else {
+    document.getElementById("loginPage").style.display = "block";
+  }
+};
 
-    async function save() {
-      const tree = document.getElementById('treeData').value;
-      const res = await fetch(API_BASE_URL + '/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password, tree })
-      });
-      const json = await res.json();
-      document.getElementById('saveStatus').textContent = json.success ? '✅ Saved!' : '❌ ' + json.message;
-    }
-  </script>
+async function register() {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  const phone = document.getElementById("phone").value;
+  const res = await fetch(API_BASE + "register", {
+    method: "POST",
+    body: JSON.stringify({ email, pass, phone })
+  });
+  if (res.ok) {
+    localStorage.setItem("email", email);
+    currentEmail = email;
+    fetchTree();
+  } else {
+    alert(await res.text());
+  }
+}
 
+async function login() {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  const res = await fetch(API_BASE + "login", {
+    method: "POST",
+    body: JSON.stringify({ email, pass })
+  });
+  if (res.ok) {
+    localStorage.setItem("email", email);
+    currentEmail = email;
+    familyTree = await res.json();
+    showTree();
+  } else {
+    alert(await res.text());
+  }
+}
+
+function fetchTree() {
+  login();
+}
+
+function showTree() {
+  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("treePage").style.display = "block";
+
+  const treeContainer = document.getElementById("treeContainer");
+  treeContainer.innerHTML = "";
+  if (familyTree.length === 0) {
+    const root = createPersonNode({ name: "You" }, true);
+    treeContainer.appendChild(root);
+  } else {
+    familyTree.forEach(person => {
+      const el = createPersonNode(person);
+      treeContainer.appendChild(el);
+    });
+  }
+}
+
+function createPersonNode(person, isRoot = false) {
+  const div = document.createElement("div");
+  div.className = "node";
+  div.innerText = person.name || "Unnamed";
+  div.onclick = (e) => e.stopPropagation();
+  div.oncontextmenu = (e) => {
+    e.preventDefault();
+    showContextMenu(e.pageX, e.pageY, person);
+  };
+  return div;
+}
+
+function showContextMenu(x, y, person) {
+  const menu = document.getElementById("contextMenu");
+  menu.innerHTML = "";
+  ["Father", "Mother", "Brother", "Sister", "Son", "Daughter", "Wife"].forEach(rel => {
+    const item = document.createElement("div");
+    item.innerText = "Add " + rel;
+    item.onclick = () => {
+      menu.style.display = "none";
+      addRelative(person, rel);
+    };
+    menu.appendChild(item);
+  });
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  menu.style.display = "block";
+}
+
+window.onclick = () => {
+  document.getElementById("contextMenu").style.display = "none";
+};
+
+function addRelative(person, relation) {
+  const name = prompt("Enter name:");
+  const gender = prompt("Enter gender (M/F):");
+  const dob = prompt("Date of Birth:");
+  const dod = prompt("Date of Death (if any):");
+  const age = prompt("Age:");
+  const bio = prompt("Short Bio:");
+  const img = prompt("Image (Base64):");
+  const newPerson = { name, gender, dob, dod, age, bio, img, relationTo: person.name, relation };
+  familyTree.push(newPerson);
+  showTree();
+}
+</script>
 </body>
 </html>
